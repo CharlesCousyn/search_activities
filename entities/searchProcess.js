@@ -35,11 +35,12 @@ async function getResultsFromActivityString(activityString)
             [handlerDuckDuck.name, handlerDuckDuck.toString()]
         ];
 
-        //Create an Handler
-        let results = await page.evaluate(handlerDuckDuck.domToResults4, myMap, 50);
+		let wantedNumberOfResults = 750;
+		console.log("Getting " + wantedNumberOfResults + " results from DuckDuckGo....");
+        let results = await page.evaluate(handlerDuckDuck.domToResults4, myMap, wantedNumberOfResults);
 
-		console.log("Number: " + results.length);
-        results.forEach(elem => {console.log(elem.toString())});
+		console.log("Results gathered !");
+		console.log("Number: " + results.length + "/"+wantedNumberOfResults);
 
         //await browser.close();
     }

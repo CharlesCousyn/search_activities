@@ -287,41 +287,28 @@ export default class handlerSearchDuckDuck extends handlerSearchEngine
 							let title = elem.querySelector("h2.result__title > a.result__a").textContent;
 							let url = elem.querySelector("h2.result__title > a.result__a").href;
 							let snippet = elem.querySelector(".result__snippet ").textContent;
-							//console.log("this.results: "+results);
 							results.push(new searchResult(title, url, snippet));
 						});
 
 						//Is it exactly the quantity I want?
 						if(results.length === maxNumberResults)
 						{
-							console.log("Coucou 1");
-
-							//Show Results infos
-							//console.log("Results Crawled: " + results.length);
-							//results.forEach(elem =>{console.log(elem.toString());});
 							clearInterval(idSetInterval);
 							resolve(results);
 						}
 						//Have I too much results?
 						else if(results.length > maxNumberResults)
 						{
-							console.log("Coucou 2");
 							results =results.slice(0, maxNumberResults);
-
-							//Show Results infos
-							//console.log("Results Crawled: " + results.length);
-							//results.forEach(elem =>{console.log(elem.toString());});
 							clearInterval(idSetInterval);
 							resolve(results);
 						}
 						//I have not enough results
 						else
 						{
-							console.log("Coucou 3");
-
 							//If button exists, we click
 							let button = document.querySelector(".result--more__btn");
-							if(button !== undefined)
+							if(button !== null)
 							{
 								button.click();
 							}
