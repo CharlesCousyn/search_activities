@@ -1,12 +1,14 @@
 const puppeteer = require("puppeteer");
+const pThrottle = require('p-throttle');
 import searchResult from "../entities/searchResult"
 import handlerSearchEngine from "../entities/handlerSearchEngine"
 import handlerDuckDuck from "../entities/handlerDuckDuck"
 
-async function getResultsFromUrls(activitiesString, urls, wantedNumberResults)
+async function getResultsFromUrls(activitiesString, urls, wantedNumberResults, activitiesPerSecond)
 {
     try
     {
+    	//Launch Browser
 		const browser = await puppeteer.launch(/*{headless: false}*/);
 
 
@@ -14,9 +16,8 @@ async function getResultsFromUrls(activitiesString, urls, wantedNumberResults)
 		let promisesOfResults = [];
 		for(let i = 0; i < urls.length; i++)
 		{
-			//Launch Browser and open page
+			//Open page
 			const page = await browser.newPage();
-			await page.goto(urls[i], {waitUntil: "load"});
 
 			//Get access to console output
 			page.on('console', async msg => {
@@ -39,8 +40,15 @@ async function getResultsFromUrls(activitiesString, urls, wantedNumberResults)
 				[handlerDuckDuck.name, handlerDuckDuck.toString()]
 			];
 
-			//Create one promise per activity
-			promisesOfResults.push(page.evaluate(handlerDuckDuck.domToResults4, myMap, wantedNumberResults));
+			//Create one promise (with rate limit) per activity
+			let pThrottlePromise = pThrottle(async () =>
+			{
+				await page.goto(urls[i], {waitUntil: "load"});
+
+				return page.evaluate(handlerDuckDuck.domToResults4, myMap, wantedNumberResults);
+			}, activitiesPerSecond, 1000);
+
+			promisesOfResults.push(pThrottlePromise());
 		}
 
 
@@ -62,9 +70,9 @@ function promiseParentMessage()
 	return new Promise((resolve, reject) =>
 	{
 		process.on('message',
-			async ({activitiesString, urls, wantedNumberResults}) =>
+			async ({activitiesString, urls, wantedNumberResults, activitiesPerSecond}) =>
 			{
-				await getResultsFromUrls(activitiesString, urls, wantedNumberResults);
+				await getResultsFromUrls(activitiesString, urls, wantedNumberResults, activitiesPerSecond);
 				resolve();
 			});
 	});

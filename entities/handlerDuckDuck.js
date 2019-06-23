@@ -53,7 +53,7 @@ export default class handlerSearchDuckDuck extends handlerSearchEngine
 							else
 							{
 								//If here no more results available
-								console.log("No more results available !!");
+								//console.log("No more results available !!");
 								clearInterval(idSetInterval);
 								resolve(results);
 							}

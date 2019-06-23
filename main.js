@@ -4,7 +4,7 @@ const OS = require('os');
 const fork = require('child_process').fork;
 const fs = require('fs').promises;
 
-async function getResultsFromActivitiesString(activitiesStringTab, wantedNumberResults)
+async function getResultsFromActivitiesString(activitiesStringTab, wantedNumberResults, activitiesPerSecond)
 {
 	let numberActivities = activitiesStringTab.length;
 
@@ -54,7 +54,13 @@ async function getResultsFromActivitiesString(activitiesStringTab, wantedNumberR
 			}
 		});
 
-		child.send({activitiesString: arrayOfArrays[0][i], urls: arrayOfArrays[1][i], wantedNumberResults: wantedNumberResults});
+		child.send(
+			{
+				activitiesString: arrayOfArrays[0][i],
+				urls: arrayOfArrays[1][i],
+				wantedNumberResults: wantedNumberResults,
+				activitiesPerSecond: activitiesPerSecond / cpuCount
+			});
 	}
 
 	console.log("Searching " + wantedNumberResults + " results for "+ numberActivities + " activities...");
@@ -100,6 +106,7 @@ function activityString2Url(activitiesStringTab, baseUrl, requestWords)
 	return urlTab;
 }
 
+//Divide work and give to processors
 function divideArrayOfUrlAndActivities(activitiesStringTab, urlTab, wantedTabs)
 {
 	let numberOfUrl = urlTab.length;
@@ -138,6 +145,8 @@ function divideArrayOfUrlAndActivities(activitiesStringTab, urlTab, wantedTabs)
 	return [arrayOfArrays1, arrayOfArrays2];
 }
 
-getResultsFromActivitiesString(
-	["make tea", "brush teeth", "cook", "make kids", "cook pasta",
-		"watch tv", "wash the floor", "wash the dishes", "drink water", "do poop"], 750).then();
+let activitiesStringTab = ["make tea", "brush teeth", "cook", "make kids", "cook pasta",
+	"watch tv", "wash the floor", "wash the dishes", "drink water", "do poop"];
+
+//Execute the main process
+getResultsFromActivitiesString(activitiesStringTab, 750, 2).then();
