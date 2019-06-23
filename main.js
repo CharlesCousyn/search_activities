@@ -5,6 +5,8 @@ const fork = require('child_process').fork;
 
 async function getResultsFromActivitiesString(activitiesStringTab)
 {
+	let numberActivities = activitiesStringTab.length;
+
 	//Initiate handler
 	let myHandlerDuckDuck = new handlerDuckDuck();
 
@@ -23,43 +25,22 @@ async function getResultsFromActivitiesString(activitiesStringTab)
 	let arrayOfArrays = divideArrayOfUrlAndActivities(activitiesStringTab, urlTab, cpuCount);
 	console.log(arrayOfArrays);
 
-	//Construct promises
-	let promises = [];
+	//Create the x child processes
+	let countResponses = 0;
 	for(let i = 0; i < arrayOfArrays[0].length; i++)
-	{
-		promises.push(promiseChildMessage(arrayOfArrays[0][i], arrayOfArrays[1][i]));
-	}
-
-	let allResults = await Promise.all(promises);
-
-	console.log(allResults);
-
-}
-
-function promiseChildMessage(activitiesString, urls)
-{
-	return new Promise((resolve, reject) =>
 	{
 		const child = fork(__dirname + "/entities/searchProcess.js",);
 
 		child.on('message', (m) =>
 		{
-			resolve(m);
+			countResponses++;
+			console.log(100 * countResponses / numberActivities+ " %");
+			//console.log(m);
 		});
 
-		child.on('error', (e) =>
-		{
-			reject(e);
-		});
+		child.send({activitiesString: arrayOfArrays[0][i], urls: arrayOfArrays[1][i]});
+	}
 
-		child.on('exit', () =>
-		{
-			resolve();
-		});
-
-
-		child.send([activitiesString, urls]);
-	});
 }
 
 function activityString2Url(activitiesStringTab, baseUrl, requestWords)

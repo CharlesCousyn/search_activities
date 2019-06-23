@@ -6,16 +6,20 @@ import handlerDuckDuck from "../entities/handlerDuckDuck"
 
 
 
-async function getResultsFromUrls(urlArray)
+async function getResultsFromUrls(activitiesString, urls)
 {
     try
     {
 		const browser = await puppeteer.launch(/*{headless: false}*/);
-		urlArray.forEach( async url =>
+
+
+		//For each activity
+		let promisesOfResults = [];
+		for(let i = 0; i < urls.length; i++)
 		{
 			//Launch Browser and open page
 			const page = await browser.newPage();
-			await page.goto(url, {waitUntil: "load"});
+			await page.goto(urls[i], {waitUntil: "load"});
 
 			//Get access to console output
 			page.on('console', async msg => {
@@ -40,13 +44,14 @@ async function getResultsFromUrls(urlArray)
 
 			let wantedNumberOfResults = 10;
 			console.log("Getting " + wantedNumberOfResults + " results from DuckDuckGo....");
-			let results = await page.evaluate(handlerDuckDuck.domToResults4, myMap, wantedNumberOfResults);
 
-			console.log("Results gathered !");
-			console.log("Number: " + results.length + "/"+wantedNumberOfResults);
+			//Create one promise per activity
+			promisesOfResults.push(page.evaluate(handlerDuckDuck.domToResults4, myMap, wantedNumberOfResults));
+		}
 
-			//await browser.close();
-		});
+
+		//Execute all promises sending a message for each promise
+		await executePromisesAndSendMessage(activitiesString, promisesOfResults);
     }
     catch (error)
     {
@@ -60,13 +65,32 @@ function promiseParentMessage()
 	return new Promise((resolve, reject) =>
 	{
 		process.on('message',
-			async m =>
+			async ({activitiesString, urls}) =>
 			{
-				let results = await getResultsFromUrls(m[1]);
-				process.send([m[0], results]);
+				await getResultsFromUrls(activitiesString, urls);
 				resolve();
 			});
 	});
+}
+
+function executePromisesAndSendMessage(activitiesString, proms)
+{
+	for (let i =0; i < proms.length; i++)
+	{
+		proms[i]
+		//Send array of results
+		.then(results =>
+		{
+			process.send({activityName: activitiesString[i], results: results});
+		})
+		//Send empty array if error
+		.catch(e =>
+		{
+			console.error(e);
+			process.send({activityName: activitiesString[i], results: []});
+		});
+	}
+	return Promise.all(proms);
 }
 
 promiseParentMessage().then();
