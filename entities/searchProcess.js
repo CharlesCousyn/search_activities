@@ -3,10 +3,7 @@ import searchResult from "../entities/searchResult"
 import handlerSearchEngine from "../entities/handlerSearchEngine"
 import handlerDuckDuck from "../entities/handlerDuckDuck"
 
-
-
-
-async function getResultsFromUrls(activitiesString, urls)
+async function getResultsFromUrls(activitiesString, urls, wantedNumberResults)
 {
     try
     {
@@ -42,16 +39,16 @@ async function getResultsFromUrls(activitiesString, urls)
 				[handlerDuckDuck.name, handlerDuckDuck.toString()]
 			];
 
-			let wantedNumberOfResults = 10;
-			console.log("Getting " + wantedNumberOfResults + " results from DuckDuckGo....");
-
 			//Create one promise per activity
-			promisesOfResults.push(page.evaluate(handlerDuckDuck.domToResults4, myMap, wantedNumberOfResults));
+			promisesOfResults.push(page.evaluate(handlerDuckDuck.domToResults4, myMap, wantedNumberResults));
 		}
 
 
 		//Execute all promises sending a message for each promise
-		await executePromisesAndSendMessage(activitiesString, promisesOfResults);
+		await executePromisesAndSendMessage(activitiesString, promisesOfResults, wantedNumberResults);
+
+		//Stop browser
+		browser.close();
     }
     catch (error)
     {
@@ -65,15 +62,15 @@ function promiseParentMessage()
 	return new Promise((resolve, reject) =>
 	{
 		process.on('message',
-			async ({activitiesString, urls}) =>
+			async ({activitiesString, urls, wantedNumberResults}) =>
 			{
-				await getResultsFromUrls(activitiesString, urls);
+				await getResultsFromUrls(activitiesString, urls, wantedNumberResults);
 				resolve();
 			});
 	});
 }
 
-function executePromisesAndSendMessage(activitiesString, proms)
+function executePromisesAndSendMessage(activitiesString, proms, wantedNumberResults)
 {
 	for (let i =0; i < proms.length; i++)
 	{
@@ -81,16 +78,28 @@ function executePromisesAndSendMessage(activitiesString, proms)
 		//Send array of results
 		.then(results =>
 		{
-			process.send({activityName: activitiesString[i], results: results});
+			process.send(
+				{
+					activityName: activitiesString[i],
+					wantedNumberResults: wantedNumberResults,
+					realNumberResults: results.length,
+					results: results});
 		})
 		//Send empty array if error
 		.catch(e =>
 		{
 			console.error(e);
-			process.send({activityName: activitiesString[i], results: []});
+			process.send(
+				{
+					activityName: activitiesString[i],
+					wantedNumberResults: wantedNumberResults,
+					realNumberResults: 0,
+					results: []
+				});
 		});
 	}
 	return Promise.all(proms);
 }
 
+//Launch work!
 promiseParentMessage().then();

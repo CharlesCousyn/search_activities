@@ -2,8 +2,9 @@ import handlerDuckDuck from "./entities/handlerDuckDuck";
 
 const OS = require('os');
 const fork = require('child_process').fork;
+const fs = require('fs').promises;
 
-async function getResultsFromActivitiesString(activitiesStringTab)
+async function getResultsFromActivitiesString(activitiesStringTab, wantedNumberResults)
 {
 	let numberActivities = activitiesStringTab.length;
 
@@ -26,21 +27,52 @@ async function getResultsFromActivitiesString(activitiesStringTab)
 	console.log(arrayOfArrays);
 
 	//Create the x child processes
-	let countResponses = 0;
+	//Array of json objects {activityName: activitiesString[i], results: results}
+	let allResults = [];
 	for(let i = 0; i < arrayOfArrays[0].length; i++)
 	{
 		const child = fork(__dirname + "/entities/searchProcess.js",);
 
-		child.on('message', (m) =>
+		child.on('message', async (m) =>
 		{
-			countResponses++;
-			console.log(100 * countResponses / numberActivities+ " %");
-			//console.log(m);
+			//Add the object activity-results to the array
+			allResults.push(m);
+
+			//Log progress
+			let percents = 100 * allResults.length / numberActivities;
+			console.log("Progress: " + allResults.length + "/" + numberActivities + " (" + percents +" %)");
+
+			//Create a file with timestamp and exit if have have all results we need
+			if(allResults.length === numberActivities)
+			{
+				console.log("Writing a new file of results ....");
+				await createFile(allResults);
+				console.log("New file of results generated !");
+
+				//Exit program
+				process.exit(0);
+			}
 		});
 
-		child.send({activitiesString: arrayOfArrays[0][i], urls: arrayOfArrays[1][i]});
+		child.send({activitiesString: arrayOfArrays[0][i], urls: arrayOfArrays[1][i], wantedNumberResults: wantedNumberResults});
 	}
 
+	console.log("Searching " + wantedNumberResults + " results for "+ numberActivities + " activities...");
+
+}
+
+async function createFile(allResults)
+{
+	let timestamp = (new Date()).getTime();
+
+	try
+	{
+		await fs.writeFile(__dirname + "/results/" + timestamp + "_results.json", JSON.stringify(allResults, null, "\t"));
+	}
+	catch(e)
+	{
+		console.error(e);
+	}
 }
 
 function activityString2Url(activitiesStringTab, baseUrl, requestWords)
@@ -108,4 +140,4 @@ function divideArrayOfUrlAndActivities(activitiesStringTab, urlTab, wantedTabs)
 
 getResultsFromActivitiesString(
 	["make tea", "brush teeth", "cook", "make kids", "cook pasta",
-		"watch tv", "wash the floor", "wash the dishes", "drink water", "do poop"]).then();
+		"watch tv", "wash the floor", "wash the dishes", "drink water", "do poop"], 750).then();
