@@ -16,24 +16,7 @@ async function getResultsFromUrls(activitiesString, urls, wantedNumberResults, a
 		let promisesOfResults = [];
 		for(let i = 0; i < urls.length; i++)
 		{
-			//Open page
-			const page = await browser.newPage();
-
-			//Get access to console output
-			page.on('console', async msg => {
-				const args = await msg.args();
-				args.forEach(async (arg) => {
-					const val = await arg.jsonValue();
-					// value is serializable
-					if (JSON.stringify(val) !== JSON.stringify({})) console.log(val);
-					// value is unserializable (or an empty oject)
-					else {
-						const { type, subtype, description } = arg._remoteObject;
-						console.log(`type: ${type}, subtype: ${subtype}, description:\n ${description}`);
-					}
-				})});
-
-			//Adding the class result in Browser context
+			//Adding classes in Browser context
 			let myMap = [
 				[searchResult.name, searchResult.toString()],
 				[handlerSearchEngine.name, handlerSearchEngine.toString()],
@@ -43,9 +26,31 @@ async function getResultsFromUrls(activitiesString, urls, wantedNumberResults, a
 			//Create one promise (with rate limit) per activity
 			let pThrottlePromise = pThrottle(async () =>
 			{
+				//Open page
+				const page = await browser.newPage();
+
+				//Get access to console output
+				page.on('console', async msg => {
+					const args = await msg.args();
+					args.forEach(async (arg) => {
+						const val = await arg.jsonValue();
+						// value is serializable
+						if (JSON.stringify(val) !== JSON.stringify({})) console.log(val);
+						// value is unserializable (or an empty oject)
+						else
+							{
+							const { type, subtype, description } = arg._remoteObject;
+							console.log(`type: ${type}, subtype: ${subtype}, description:\n ${description}`);
+						}
+					})});
+
 				await page.goto(urls[i], {waitUntil: "load"});
 
-				return page.evaluate(handlerDuckDuck.domToResults4, myMap, wantedNumberResults);
+				let results =  await page.evaluate(handlerDuckDuck.domToResults4, myMap, wantedNumberResults);
+
+				await page.close();
+
+				return results;
 			}, activitiesPerSecond, 1000);
 
 			promisesOfResults.push(pThrottlePromise());
