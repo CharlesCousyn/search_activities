@@ -1,16 +1,32 @@
 const puppeteer = require("puppeteer");
 const pThrottle = require('p-throttle');
-import searchResult from "../entities/searchResult"
+import searchResultWeb from "./searchResultWeb"
+import searchResultImage from "./searchResultImage"
 import handlerSearchEngine from "../entities/handlerSearchEngine"
 import handlerDuckDuck from "../entities/handlerDuckDuck"
 
-async function getResultsFromUrls(activitiesString, urls, wantedNumberResults, activitiesPerSecond)
+//options: { wantedNumberResults: 750, activitiesPerSecond: 2, web: true}
+async function getResultsFromUrls(activitiesString, urls, options)
 {
     try
     {
     	//Launch Browser
 		const browser = await puppeteer.launch(/*{headless: false}*/);
 
+		//Choose the type of results
+		//And choosing callback of evaluate
+		let resultClass;
+		let method;
+		if(options.web)
+		{
+			resultClass = searchResultWeb;
+			method = handlerDuckDuck.domToResultsWeb;
+		}
+		else if(options.image)
+		{
+			resultClass = searchResultImage;
+			method = handlerDuckDuck.domToResultsImage;
+		}
 
 		//For each activity
 		let promisesOfResults = [];
@@ -18,7 +34,7 @@ async function getResultsFromUrls(activitiesString, urls, wantedNumberResults, a
 		{
 			//Adding classes in Browser context
 			let myMap = [
-				[searchResult.name, searchResult.toString()],
+				[resultClass.name, resultClass.toString()],
 				[handlerSearchEngine.name, handlerSearchEngine.toString()],
 				[handlerDuckDuck.name, handlerDuckDuck.toString()]
 			];
@@ -46,19 +62,19 @@ async function getResultsFromUrls(activitiesString, urls, wantedNumberResults, a
 
 				await page.goto(urls[i], {waitUntil: "load"});
 
-				let results =  await page.evaluate(handlerDuckDuck.domToResults4, myMap, wantedNumberResults);
+				let results =  await page.evaluate(method, myMap, options.wantedNumberResults);
 
 				await page.close();
 
 				return results;
-			}, activitiesPerSecond, 1000);
+			}, options.activitiesPerSecond, 1000);
 
 			promisesOfResults.push(pThrottlePromise());
 		}
 
 
 		//Execute all promises sending a message for each promise
-		await executePromisesAndSendMessage(activitiesString, promisesOfResults, wantedNumberResults);
+		await executePromisesAndSendMessage(activitiesString, promisesOfResults, options.wantedNumberResults);
 
 		//Stop browser
 		browser.close();
@@ -69,15 +85,15 @@ async function getResultsFromUrls(activitiesString, urls, wantedNumberResults, a
     }
 }
 
-
+//options: { wantedNumberResults: 750, activitiesPerSecond: 2, web: true}
 function promiseParentMessage()
 {
 	return new Promise((resolve, reject) =>
 	{
 		process.on('message',
-			async ({activitiesString, urls, wantedNumberResults, activitiesPerSecond}) =>
+			async ({activitiesString, urls, options}) =>
 			{
-				await getResultsFromUrls(activitiesString, urls, wantedNumberResults, activitiesPerSecond);
+				await getResultsFromUrls(activitiesString, urls, options);
 				resolve();
 			});
 	});

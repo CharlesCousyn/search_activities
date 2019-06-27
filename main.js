@@ -4,8 +4,27 @@ const OS = require('os');
 const fork = require('child_process').fork;
 const fs = require('fs').promises;
 
-async function getResultsFromActivitiesString(activitiesStringTab, wantedNumberResults, activitiesPerSecond)
+async function getResultsFromActivitiesString(activitiesStringTab, options)
 {
+	//Handling options errors
+	if(options.image && options.web)
+	{
+		throw new Error("Cannot getResultsFromActivitiesString with options image and web to true !");
+	}
+	else if(typeof options === undefined)
+	{
+		throw new Error("Cannot getResultsFromActivitiesString without options !");
+	}
+	else if(options.wantedNumberResults === undefined)
+	{
+		throw new Error("Cannot getResultsFromActivitiesString without option wantedNumberResults !");
+	}
+	else if(options.activitiesPerSecond === undefined)
+	{
+		throw new Error("Cannot getResultsFromActivitiesString without option activitiesPerSecond !");
+	}
+
+
 	let numberActivities = activitiesStringTab.length;
 
 	//Initiate handler
@@ -13,10 +32,11 @@ async function getResultsFromActivitiesString(activitiesStringTab, wantedNumberR
 
 	//Static variables
 	let baseUrl = myHandlerDuckDuck.baseUrl;
+	let endUrlImage = myHandlerDuckDuck.endUrlImage;
 	let requestWords = "how to ";
 
 	//Construct url from activities string
-	let urlTab = activityString2Url(activitiesStringTab, baseUrl, requestWords);
+	let urlTab = activityString2Url(activitiesStringTab, baseUrl, endUrlImage, requestWords, options);
 	console.log(urlTab);
 
 	//Getting number of core
@@ -46,7 +66,7 @@ async function getResultsFromActivitiesString(activitiesStringTab, wantedNumberR
 			if(allResults.length === numberActivities)
 			{
 				console.log("Writing a new file of results ....");
-				await createFile(allResults);
+				await createFileOfResults(allResults, options);
 				console.log("New file of results generated !");
 
 				//Exit
@@ -64,22 +84,40 @@ async function getResultsFromActivitiesString(activitiesStringTab, wantedNumberR
 			{
 				activitiesString: arrayOfArrays[0][i],
 				urls: arrayOfArrays[1][i],
-				wantedNumberResults: wantedNumberResults,
-				activitiesPerSecond: activitiesPerSecond / cpuCount
+				options: options
 			});
 	}
 
-	console.log("Searching " + wantedNumberResults + " results for "+ numberActivities + " activities...");
+	//Configuring output
+	let stringToDisp = "";
+	if(options.web)
+	{
+		stringToDisp = "web";
+	}
+	else if(options.image)
+	{
+		stringToDisp = "image";
+	}
+	console.log("Searching " + options.wantedNumberResults + " " + stringToDisp + " results for "+ numberActivities + " activities...");
 
 }
 
-async function createFile(allResults)
+async function createFileOfResults(allResults, options)
 {
 	let timestamp = (new Date()).getTime();
+	let folderName="";
+	if(options.image)
+	{
+		folderName = "resultsImage";
+	}
+	else if(options.web)
+	{
+		folderName = "resultsWeb";
+	}
 
 	try
 	{
-		await fs.writeFile(__dirname + "/results/" + timestamp + "_results.json", JSON.stringify(allResults, null, "\t"));
+		await fs.writeFile(__dirname + "/" + folderName + "/" + timestamp + "_results.json", JSON.stringify(allResults, null, "\t"));
 	}
 	catch(e)
 	{
@@ -87,27 +125,49 @@ async function createFile(allResults)
 	}
 }
 
-function activityString2Url(activitiesStringTab, baseUrl, requestWords)
+function activityString2Url(activitiesStringTab, baseUrl, endUrl, requestWords, options)
 {
 	let urlTab = [];
-
-	activitiesStringTab.forEach(elem =>
+	if(options.web)
 	{
-		elem = requestWords + elem;
-		let parameter = elem.split(" ").reduce(((total, currentWord, index) =>
+		activitiesStringTab.forEach(elem =>
 		{
-			if(index === 0)
+			elem = requestWords + elem;
+			let parameter = elem.split(" ").reduce(((total, currentWord, index) =>
 			{
-				return total + currentWord
-			}
-			else
-			{
-				return total + "+" + currentWord
-			}
-		}), "");
+				if(index === 0)
+				{
+					return total + currentWord
+				}
+				else
+				{
+					return total + "+" + currentWord
+				}
+			}), "");
 
-		urlTab.push(baseUrl + parameter);
-	});
+			urlTab.push(baseUrl + parameter);
+		});
+	}
+	else if(options.image)
+	{
+		activitiesStringTab.forEach(elem =>
+		{
+			let parameter = elem.split(" ").reduce(((total, currentWord, index) =>
+			{
+				if(index === 0)
+				{
+					return total + currentWord
+				}
+				else
+				{
+					return total + "+" + currentWord
+				}
+			}), "");
+
+			urlTab.push(baseUrl + parameter + endUrl);
+		});
+	}
+
 
 	return urlTab;
 }
@@ -151,8 +211,12 @@ function divideArrayOfUrlAndActivities(activitiesStringTab, urlTab, wantedTabs)
 	return [arrayOfArrays1, arrayOfArrays2];
 }
 
-let activitiesStringTab = ["make tea", "brush teeth", "cook", "make kids", "cook pasta",
-	"watch tv", "wash the floor", "wash the dishes", "drink water", "do poop"];
-
 //Execute the main process
-getResultsFromActivitiesString(activitiesStringTab, 750, 2).then();
+(async () => {
+	let data = await fs.readFile("./activitiesString.json");
+	let activitiesStringTab = JSON.parse(data.toString());
+
+
+	//options: { wantedNumberResults: 750, activitiesPerSecond: 2, web: true}
+	await getResultsFromActivitiesString(activitiesStringTab, { wantedNumberResults: 750, activitiesPerSecond: 2, web: true } );
+})();

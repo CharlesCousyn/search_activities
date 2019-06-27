@@ -1,4 +1,4 @@
-import searchResult from "../entities/searchResult"
+import searchResultWeb from "./searchResultWeb"
 import handlerSearchEngine from "../entities/handlerSearchEngine"
 
 export default class handlerSearchDuckDuck extends handlerSearchEngine
@@ -7,9 +7,10 @@ export default class handlerSearchDuckDuck extends handlerSearchEngine
 	{
 		super();
 		this.baseUrl = "https://duckduckgo.com/?q=";
+		this.endUrlImage = "&iar=images&ia=images&iax=images";
 	}
 
-	static domToResults4(mapClassNameCode, maxNumberResults) {
+	static domToResultsWeb(mapClassNameCode, maxNumberResults) {
 		return new Promise(
 			async resolve => {
 				//Get the classes to be known by browser
@@ -26,7 +27,7 @@ export default class handlerSearchDuckDuck extends handlerSearchEngine
 						let title = elem.querySelector("h2.result__title > a.result__a").textContent;
 						let url = elem.querySelector("h2.result__title > a.result__a").href;
 						let snippet = elem.querySelector(".result__snippet ").textContent;
-						results.push(new searchResult(title, url, snippet));
+						results.push(new searchResultWeb(title, url, snippet));
 					});
 
 					//Is it exactly the quantity I want?
@@ -62,8 +63,10 @@ export default class handlerSearchDuckDuck extends handlerSearchEngine
 											{
 												if(node.id.substr(0, 4) === "rrd-")
 												{
+													//console.log("Nouveau batch de résultats");
 													observer.disconnect();
-													resolve();
+													//resolve();
+													setTimeout(resolve, 500);
 												}
 											}
 										);
@@ -72,8 +75,10 @@ export default class handlerSearchDuckDuck extends handlerSearchEngine
 										{
 											if(mutationRecords[i].attributeName === "style")
 											{
+												//console.log("Fin");
 												observer.disconnect();
-												resolve();
+												//resolve();
+												setTimeout(resolve, 500);
 											}
 										}
 
@@ -103,6 +108,19 @@ export default class handlerSearchDuckDuck extends handlerSearchEngine
 				} while(niPlusNiMoins);
 			}
 		);
+	}
+
+	static domToResultsImage(mapClassNameCode, maxNumberResults)
+	{
+		return new Promise(async resolve =>
+		{
+			//Get the classes to be known by browser
+			mapClassNameCode.forEach(tab =>{eval("window." + tab[0] + " = " + tab[1]);});
+
+			let results = [];
+
+			resolve(results);
+		});
 	}
 }
 

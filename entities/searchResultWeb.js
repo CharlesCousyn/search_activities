@@ -1,4 +1,4 @@
-export default class searchResult
+export default class searchResultWeb
 {
     constructor (title, url, snippet)
     {

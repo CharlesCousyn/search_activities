@@ -79,4 +79,5 @@ build/Release
 node_modules
 
 # Results files
-/results/*
+/resultsWeb/*
+/resultsImage/*
