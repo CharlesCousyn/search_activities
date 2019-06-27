@@ -208,6 +208,10 @@ function divideArrayOfUrlAndActivities(activitiesStringTab, urlTab, wantedTabs)
 		}
 	});
 
+	//Removing empty arrays to support tests on few activities
+	arrayOfArrays1 = arrayOfArrays1.filter(array => array.length > 0);
+	arrayOfArrays2 = arrayOfArrays2.filter(array => array.length > 0);
+
 	return [arrayOfArrays1, arrayOfArrays2];
 }
 
