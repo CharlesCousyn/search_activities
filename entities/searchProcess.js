@@ -115,4 +115,4 @@ function executePromisesAndSendMessage(activitiesString, proms, wantedNumberResu
 }
 
 //Launch work!
-promiseParentMessage().then();
+promiseParentMessage().then(/*()=> {process.disconnect()}*/);

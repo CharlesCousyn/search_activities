@@ -49,9 +49,15 @@ async function getResultsFromActivitiesString(activitiesStringTab, wantedNumberR
 				await createFile(allResults);
 				console.log("New file of results generated !");
 
-				//Exit program
+				//Exit
 				process.exit(0);
 			}
+		});
+
+		child.on("exit", () =>
+		{
+			console.log(child.pid);
+			console.log("exit");
 		});
 
 		child.send(
