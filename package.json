@@ -1,18 +1,25 @@
 {
   "name": "search_activities",
   "version": "1.0.0",
-  "description": "",
+  "description": "First module of a thesis in activity recognition using the web",
   "main": "main.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "install": "npm install",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node -r esm main.js"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": {
+    "name": "Charles Cousyn",
+    "email": "charles.cousyn1@uqac.ca"
+  },
+  "license": "MIT",
+  "repository": "github:CharlesCousyn/search_activities",
+  "private": true,
   "dependencies": {
     "esm": "^3.2.25",
     "p-throttle": "^3.1.0",
-    "puppeteer": "^1.17.0",
+    "puppeteer": "1.17.0",
     "redis": "^2.8.0"
   }
 }
