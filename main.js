@@ -217,10 +217,12 @@ function divideArrayOfUrlAndActivities(activitiesStringTab, urlTab, wantedTabs)
 
 //Execute the main process
 (async () => {
+	//Reading and parse the file containing activity string
 	let data = await fs.readFile("./activitiesString.json");
 	let activitiesStringTab = JSON.parse(data.toString());
 
 
 	//options: { wantedNumberResults: 750, activitiesPerSecond: 2, web: true}
-	await getResultsFromActivitiesString(activitiesStringTab, { wantedNumberResults: 200, activitiesPerSecond: 1, image: true } );
+	//options: { wantedNumberResults: 750, activitiesPerSecond: 2, image: true}
+	await getResultsFromActivitiesString(activitiesStringTab, { wantedNumberResults: 10, activitiesPerSecond: 1, image: true } );
 })();
