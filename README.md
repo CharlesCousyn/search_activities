@@ -21,5 +21,8 @@ The format is:
   wantedNumberResults: 750, 
   activitiesPerSecond: 2, 
   image: true
+  ***OR***
+  web: true
 }
 ```
+(Warning: The properties "image" and "web" are mutually exclusive)
