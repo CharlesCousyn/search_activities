@@ -1,4 +1,5 @@
 import searchResultWeb from "./searchResultWeb"
+import searchResultImage from "./searchResultImage"
 import handlerSearchEngine from "../entities/handlerSearchEngine"
 
 export default class handlerSearchDuckDuck extends handlerSearchEngine
@@ -118,6 +119,52 @@ export default class handlerSearchDuckDuck extends handlerSearchEngine
 			mapClassNameCode.forEach(tab =>{eval("window." + tab[0] + " = " + tab[1]);});
 
 			let results = [];
+
+			//Find the first image and click on it
+			document.querySelector(".tile.tile--img.has-detail").click();
+
+			//Find the detail panel and get infos from it
+			let detailPanel = document.querySelector(".detail.detail--slider.detail--images.detail--xd");
+
+			//Loop if we could have more results
+			let niPlusNiMoins = true;
+			while(niPlusNiMoins)
+			{
+				let imageComponent = detailPanel.querySelector(".detail__media__img-link.js-detail-img.js-image-detail-link");
+				let linkToRelatedWebstite = detailPanel.querySelector(".detail__body.detail__body--images .c-detail__title a");
+
+				let titleRelatedWebsite = linkToRelatedWebstite.textContent;
+				let urlImage = imageComponent.href;
+				let urlRelatedWebsite = linkToRelatedWebstite.href;
+
+				results.push(new searchResultImage(titleRelatedWebsite, urlRelatedWebsite, urlImage));
+
+				//Exactly the good number
+				if(results.length === maxNumberResults)
+				{
+					niPlusNiMoins = false;
+				}
+				//Too Much?
+				else if(results.length > maxNumberResults)
+				{
+					results = results.slice(0, maxNumberResults);
+					niPlusNiMoins = false;
+				}
+				//Not Enought
+				else
+				{
+
+					await new Promise(resolve =>
+					{
+						setTimeout(() =>
+						{
+							detailPanel.querySelector(".tile-nav--sm.tile-nav--sm--next.js-detail-next.can-scroll").click();
+							resolve();
+						}, 250);
+					});
+				}
+
+			}
 
 			resolve(results);
 		});

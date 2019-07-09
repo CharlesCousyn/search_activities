@@ -6,7 +6,7 @@ export default class searchResultImage
 		{
 			this.titleRelatedPage = titleRelatedPage.titleRelatedPage;
 			this.urlRelatedPage = titleRelatedPage.urlRelatedPage;
-			this.urlImage = title.urlImage;
+			this.urlImage = titleRelatedPage.urlImage;
 		}
 		else
 		{

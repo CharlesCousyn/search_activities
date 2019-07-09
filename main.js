@@ -222,5 +222,5 @@ function divideArrayOfUrlAndActivities(activitiesStringTab, urlTab, wantedTabs)
 
 
 	//options: { wantedNumberResults: 750, activitiesPerSecond: 2, web: true}
-	await getResultsFromActivitiesString(activitiesStringTab, { wantedNumberResults: 750, activitiesPerSecond: 2, web: true } );
+	await getResultsFromActivitiesString(activitiesStringTab, { wantedNumberResults: 200, activitiesPerSecond: 1, image: true } );
 })();

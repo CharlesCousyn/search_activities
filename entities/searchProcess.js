@@ -60,7 +60,7 @@ async function getResultsFromUrls(activitiesString, urls, options)
 						}
 					})});
 
-				await page.goto(urls[i], {waitUntil: "load"});
+				await page.goto(urls[i], {waitUntil: "load", timeout: 3000000});
 
 				let results =  await page.evaluate(method, myMap, options.wantedNumberResults);
 
