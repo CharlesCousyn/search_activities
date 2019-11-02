@@ -162,8 +162,6 @@ async function crawlImages(tab)
 				getPropertyFromElement(tab, linkToRelatedWebstite, "href")
 			]);
 
-			console.log("titleRelatedWebsite", titleRelatedWebsite);
-
 			results.push(new searchResultImage(titleRelatedWebsite, urlRelatedWebsite, urlImage));
 			//console.log(results);
 
