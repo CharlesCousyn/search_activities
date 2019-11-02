@@ -14,15 +14,15 @@ Just run ```npm start```
 In the root folder, in the file ```activitiesString.json```
 
 **Where can I change my parameters?** <br/>
-In the root folder, in the file ```main.js```, there is an object named options. 
-The format is:
+In the root folder, in the file ```generalConfig.json```
 ```
-{ 
-  wantedNumberResults: 750, 
-  activitiesPerSecond: 2, 
-  image: true
-  ***OR***
-  web: true
+{
+  "numberOfTabsUsed": 1, //Parallel parameter
+  "baseUrl" : "https://duckduckgo.com/?q=",
+  "endUrlImage" : "&iar=images&ia=images&iax=images",
+  "wantedNumberResults": 2,
+  "crawlMode": "image", //OR "web"
+  "requestWords" : "how to ",
+  "headlessMode": true  //To see chrome GUI
 }
 ```
-(Warning: The properties "image" and "web" are mutually exclusive)
