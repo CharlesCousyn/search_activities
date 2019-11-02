@@ -1,123 +1,47 @@
-import handlerDuckDuck from "./entities/handlerDuckDuck";
+import activitiesString from "./activitiesString"
+import GENERAL_CONFIG from "./generalConfig"
 
-const OS = require('os');
-const fork = require('child_process').fork;
-const fs = require('fs').promises;
+const filesystem = require('fs').promises;
+import { from} from 'rxjs'
+import { map, concatMap, mergeMap, toArray, bufferCount, tap } from 'rxjs/operators'
+import puppeteer from "puppeteer"
+import searchResultWeb from "./entities/searchResultWeb";
+import searchResultImage from "./entities/searchResultImage";
 
-async function getResultsFromActivitiesString(activitiesStringTab, options)
+function addUrl(activityString, requestWords)
 {
-	//Handling options errors
-	if(options.image && options.web)
-	{
-		throw new Error("Cannot getResultsFromActivitiesString with options image and web to true !");
-	}
-	else if(typeof options === undefined)
-	{
-		throw new Error("Cannot getResultsFromActivitiesString without options !");
-	}
-	else if(options.wantedNumberResults === undefined)
-	{
-		throw new Error("Cannot getResultsFromActivitiesString without option wantedNumberResults !");
-	}
-	else if(options.activitiesPerSecond === undefined)
-	{
-		throw new Error("Cannot getResultsFromActivitiesString without option activitiesPerSecond !");
-	}
-
-
-	let numberActivities = activitiesStringTab.length;
-
-	//Initiate handler
-	let myHandlerDuckDuck = new handlerDuckDuck();
-
 	//Static variables
-	let baseUrl = myHandlerDuckDuck.baseUrl;
-	let endUrlImage = myHandlerDuckDuck.endUrlImage;
-	let requestWords = "how to ";
+	let baseUrl = GENERAL_CONFIG.baseUrl;
+	let endUrlImage = GENERAL_CONFIG.endUrlImage;
 
 	//Construct url from activities string
-	let urlTab = activityString2Url(activitiesStringTab, baseUrl, endUrlImage, requestWords, options);
-	console.log(urlTab);
-
-	//Getting number of core
-	let cpuCount = OS.cpus().length;
-	console.log(cpuCount);
-
-	let arrayOfArrays = divideArrayOfUrlAndActivities(activitiesStringTab, urlTab, cpuCount);
-	console.log(arrayOfArrays);
-
-	//Create the x child processes
-	//Array of json objects {activityName: activitiesString[i], results: results}
-	let allResults = [];
-	for(let i = 0; i < arrayOfArrays[0].length; i++)
-	{
-		const child = fork(__dirname + "/entities/searchProcess.js",);
-
-		child.on('message', async (m) =>
-		{
-			//Add the object activity-results to the array
-			allResults.push(m);
-
-			//Log progress
-			let percents = 100 * allResults.length / numberActivities;
-			console.log("Progress: " + allResults.length + "/" + numberActivities + " (" + percents +" %)");
-
-			//Create a file with timestamp and exit if have have all results we need
-			if(allResults.length === numberActivities)
-			{
-				console.log("Writing a new file of results ....");
-				await createFileOfResults(allResults, options);
-				console.log("New file of results generated !");
-
-				//Exit
-				process.exit(0);
-			}
-		});
-
-		child.on("exit", () =>
-		{
-			console.log(child.pid);
-			console.log("exit");
-		});
-
-		child.send(
-			{
-				activitiesString: arrayOfArrays[0][i],
-				urls: arrayOfArrays[1][i],
-				options: options
-			});
-	}
-
-	//Configuring output
-	let stringToDisp = "";
-	if(options.web)
-	{
-		stringToDisp = "web";
-	}
-	else if(options.image)
-	{
-		stringToDisp = "image";
-	}
-	console.log("Searching " + options.wantedNumberResults + " " + stringToDisp + " results for "+ numberActivities + " activities...");
-
+	return{
+		name: activityString,
+		url: activityString2Url(activityString, baseUrl, endUrlImage, requestWords),
+		wantedNumberResults: GENERAL_CONFIG.wantedNumberResults
+	};
 }
 
-async function createFileOfResults(allResults, options)
+async function createFileOfResults(allResults)
 {
 	let timestamp = (new Date()).getTime();
-	let folderName="";
-	if(options.image)
+	let folderName = "";
+	switch(GENERAL_CONFIG.crawlMode)
 	{
-		folderName = "resultsImage";
-	}
-	else if(options.web)
-	{
-		folderName = "resultsWeb";
+		case "web":
+			folderName = "resultsWeb";
+			break;
+		case "image":
+			folderName = "resultsImage";
+			break;
+		default:
+			console.error("Bad crawlMode");
+			folderName = "";
 	}
 
 	try
 	{
-		await fs.writeFile(__dirname + "/" + folderName + "/" + timestamp + "_results.json", JSON.stringify(allResults, null, "\t"));
+		await filesystem.writeFile(__dirname + "/" + folderName + "/" + timestamp + "_results.json", JSON.stringify(allResults, null, "\t"));
 	}
 	catch(e)
 	{
@@ -125,15 +49,27 @@ async function createFileOfResults(allResults, options)
 	}
 }
 
-function activityString2Url(activitiesStringTab, baseUrl, endUrl, requestWords, options)
+function activityString2Url(activityString, baseUrl, endUrl, requestWords)
 {
-	let urlTab = [];
-	if(options.web)
+	let parameter = "";
+	switch(GENERAL_CONFIG.crawlMode)
 	{
-		activitiesStringTab.forEach(elem =>
-		{
-			elem = requestWords + elem;
-			let parameter = elem.split(" ").reduce(((total, currentWord, index) =>
+		case "web":
+			activityString = requestWords + activityString;
+			parameter = activityString.split(" ").reduce(((total, currentWord, index) =>
+			{
+				if(index === 0)
+				{
+					return total + currentWord
+				}
+				else
+				{
+					return total + "+" + currentWord
+				}
+			}), "");
+			return baseUrl + parameter;
+		case "image":
+			parameter = activityString.split(" ").reduce(((total, currentWord, index) =>
 			{
 				if(index === 0)
 				{
@@ -145,84 +81,339 @@ function activityString2Url(activitiesStringTab, baseUrl, endUrl, requestWords, 
 				}
 			}), "");
 
-			urlTab.push(baseUrl + parameter);
-		});
-	}
-	else if(options.image)
-	{
-		activitiesStringTab.forEach(elem =>
-		{
-			let parameter = elem.split(" ").reduce(((total, currentWord, index) =>
-			{
-				if(index === 0)
-				{
-					return total + currentWord
-				}
-				else
-				{
-					return total + "+" + currentWord
-				}
-			}), "");
-
-			urlTab.push(baseUrl + parameter + endUrl);
-		});
+			return baseUrl + parameter + endUrl;
+		default:
+			console.error("Bad crawlMode, check the generalConfig.json file");
+			return ""
 	}
 
-
-	return urlTab;
 }
 
-//Divide work and give to processors
-function divideArrayOfUrlAndActivities(activitiesStringTab, urlTab, wantedTabs)
+async function crawl(tab)
 {
-	let numberOfUrl = urlTab.length;
-	let baseNumberOfUrlInSmallTabs = Math.floor(numberOfUrl / wantedTabs);
-
-	let arrayOfArrays1 = [];
-	let arrayOfArrays2 = [];
-
-	//Adding the minimum of url
-	for(let i = 0; i < wantedTabs; i++)
+	switch(GENERAL_CONFIG.crawlMode)
 	{
-		arrayOfArrays1.push(activitiesStringTab.splice(0, baseNumberOfUrlInSmallTabs));
-		arrayOfArrays2.push(urlTab.splice(0, baseNumberOfUrlInSmallTabs));
+		case "web":
+			return crawlWeb(tab);
+		case "image":
+			return crawlImages(tab);
+	}
+}
+
+async function getResultsFromActivityObj(oneActivityObj, tab)
+{
+	//console.log(oneActivityObj);
+	await tab.goto(oneActivityObj.url, {waitUntil: "load", timeout: 3000000});
+
+	//Get results promise of results
+	const results = await crawl(tab);
+
+	oneActivityObj.realNumberResults = results.length;
+	oneActivityObj.results = results;
+
+	return oneActivityObj;
+}
+
+function waitForProm(tab, timeToWait)
+{
+	return tab.waitFor(timeToWait);
+}
+
+function getPropertyFromElement(tab, element, propertyName)
+{
+	return tab.evaluate((element, propertyName) => element[propertyName], element, propertyName);
+}
+
+async function crawlImages(tab)
+{
+	//ARTIFICIAL FIX
+	const maxNumberResults = GENERAL_CONFIG.wantedNumberResults + 1;
+	//const maxNumberResults = GENERAL_CONFIG.wantedNumberResults;
+
+	let results = [];
+
+	try
+	{
+		let detailPanelSelector = ".detail.detail--slider.detail--images.detail--xd";
+
+		//Find the first image and click on it
+		await tab.waitForSelector(".tile.tile--img.has-detail");
+		await tab.click(".tile.tile--img.has-detail");
+		//console.log("Click first image");
+
+
+		//Loop if we could have more results
+		let niPlusNiMoins = true;
+		do
+		{
+			//Find the detail panel and get infos from it
+			let detailPanel = await tab.$(detailPanelSelector);
+			//console.log("Find the detail panel and get infos from it");
+
+			//console.log("Getting one image info...");
+			let [imageComponent, linkToRelatedWebstite] = await Promise.all([
+				detailPanel.$(".detail__media__img-link.js-detail-img.js-image-detail-link"),
+				detailPanel.$(".detail__body.detail__body--images .c-detail__title a")
+			]);
+
+			let [titleRelatedWebsite, urlImage, urlRelatedWebsite] = await Promise.all([
+				getPropertyFromElement(tab, linkToRelatedWebstite, "textContent"),
+				getPropertyFromElement(tab,imageComponent, "href"),
+				getPropertyFromElement(tab, linkToRelatedWebstite, "href")
+			]);
+
+			console.log("titleRelatedWebsite", titleRelatedWebsite);
+
+			results.push(new searchResultImage(titleRelatedWebsite, urlRelatedWebsite, urlImage));
+			//console.log(results);
+
+			//Exactly the good number
+			if(results.length === maxNumberResults)
+			{
+				niPlusNiMoins = false;
+				//console.log("Finished");
+			}
+			//Too Much?
+			else if(results.length > maxNumberResults)
+			{
+				results = results.slice(0, maxNumberResults);
+				niPlusNiMoins = false;
+				//console.log("Too much");
+			}
+			//Not Enought
+			else
+			{
+				//console.log("Not enough");
+				const buttonNextSelector = ".tile-nav--sm.tile-nav--sm--next.js-detail-next.can-scroll";
+				const completeSelector = `${detailPanelSelector} ${buttonNextSelector}`;
+
+				await tab.waitForSelector(completeSelector);
+				await Promise.all([
+					tab.evaluate(selector => document.querySelector(selector).click(), completeSelector),
+					waitForProm(tab, 250)]);
+				//console.log("Click to next image done");
+			}
+		}while(niPlusNiMoins);
+	}
+	catch (e)
+	{
+		console.error(e);
 	}
 
-	//Adding the remaining activityString
-	arrayOfArrays1.forEach(array =>
+	//ARTIFICIAL FIX
+	return results.slice(1, maxNumberResults);
+	//return results;
+}
+
+async function crawlWeb(tab)
+{
+	const maxNumberResults = GENERAL_CONFIG.wantedNumberResults;
+	let results = [];
+
+	try
 	{
-		let activityString = activitiesStringTab.splice(0, 1)[0];
-		if(activityString !== undefined)
-		{
-			array.push(activityString);
-		}
-	});
+		let niPlusNiMoins = true;
 
-	//Adding the remaining url
-	arrayOfArrays2.forEach(array =>
+		//Loop if we could have more results
+		do
+		{
+			//Reset result tab
+			results = [];
+
+			//Get current HTML results
+			await tab.waitForSelector(".result__body");
+			const elems = await tab.$$(".result__body");
+
+			//extract info to create searchResults
+			for(let elem of elems)
+			{
+				const [titleElem, urlElem, snippetElem] = await Promise.all([
+					elem.$("h2.result__title > a.result__a"),
+					elem.$("h2.result__title > a.result__a"),
+					elem.$(".result__snippet ")
+				]);
+
+				const [title, url, snippet] = await Promise.all([
+					getPropertyFromElement(tab, titleElem, "textContent"),
+					getPropertyFromElement(tab, urlElem, "href"),
+					getPropertyFromElement(tab, snippetElem, "textContent")
+				]);
+				results.push(new searchResultWeb(title, url, snippet));
+			}
+
+			//Is it exactly the quantity I want?
+			if(results.length === maxNumberResults)
+			{
+				niPlusNiMoins = false;
+				//console.log("Perfect Finished");
+			}
+			//Have I too much results?
+			else if(results.length > maxNumberResults)
+			{
+				results = results.slice(0, maxNumberResults);
+				niPlusNiMoins = false;
+				//console.log("Too much but Finished");
+			}
+			//I have not enough results
+			else
+			{
+				//console.log("Not enough");
+				const buttonSelector = ".result--more__btn";
+
+				await tab.waitForSelector("[id^=rrd-]");
+				let oldNumberOfPages = (await tab.$$("[id^=rrd-]")).length;
+				//console.log("oldNumberOfPages", oldNumberOfPages);
+
+				await Promise.all([
+					tab.waitForFunction(oldNumberOfPages =>
+					{
+						//console.log("oldNumberOfPages", oldNumberOfPages);
+						const newNumberOfPages = document.querySelectorAll("[id^=rrd-]").length;
+						const endElement = document.querySelector(".result.result--sep.is-hidden.js-result-sep.result--sep--hr.has-pagenum");
+						//console.log("newNumberOfPages", newNumberOfPages);
+						return (newNumberOfPages > oldNumberOfPages) || (endElement !== null /*&& endElement.hasAttribute("style")*/)
+					}, {}, oldNumberOfPages),
+					tab.waitForSelector(buttonSelector).then(() => tab.evaluate(selector => document.querySelector(selector).click(), buttonSelector)),
+					waitForProm(tab, 1000)
+				]);
+
+				//console.log("New Content Or No More Content!!");
+				//console.log("Button clicked!");
+
+				//Waiting loading
+				/*let promiseIfEndLoading = tab.evaluate(() => new Promise((resolve, reject) => {
+						new MutationObserver((mutationRecords, observer) =>
+						{
+							for(let i = 0; i < mutationRecords.length; i++)
+							{
+								//Searching criterias of end of loading
+								mutationRecords[i].addedNodes.forEach(
+									node =>
+									{
+										if(node.id.substr(0, 4) === "rrd-")
+										{
+											//console.log("Nouveau batch de résultats");
+											observer.disconnect();
+											//resolve();
+											setTimeout(resolve, 500);
+										}
+									}
+								);
+
+								if(mutationRecords[i].target.className === "result result--sep is-hidden js-result-sep result--sep--hr has-pagenum")
+								{
+									if(mutationRecords[i].attributeName === "style")
+									{
+										//console.log("Fin");
+										observer.disconnect();
+										//resolve();
+										setTimeout(resolve, 500);
+									}
+								}
+
+							}
+						})
+						.observe(document.querySelector(".results--main"), {
+							childList: true,
+							attributes: true,
+							subtree: true
+						});
+					}));
+*/
+
+				//console.log((await tab.$$("[id^=rrd-]")).length, ">", oldNumberOfPages, (await tab.$$("[id^=rrd-]")).length > oldNumberOfPages);
+				if((await tab.$$("[id^=rrd-]")).length > oldNumberOfPages)
+				{
+					//console.log("More results available !!");
+				}
+				else if((await tab.$(".result.result--sep.is-hidden.js-result-sep.result--sep--hr.has-pagenum")) !== null
+					&& await tab.evaluate(() => document.querySelector(".result.result--sep.is-hidden.js-result-sep.result--sep--hr.has-pagenum")
+					.hasAttribute("style")))
+				{
+					//console.log("No more results available !!");
+					niPlusNiMoins = false;
+				}
+			}
+		} while(niPlusNiMoins);
+	}
+	catch (e)
 	{
-		let url = urlTab.splice(0, 1)[0];
-		if(url !== undefined)
-		{
-			array.push(url);
-		}
-	});
+		console.error(e);
+	}
 
-	//Removing empty arrays to support tests on few activities
-	arrayOfArrays1 = arrayOfArrays1.filter(array => array.length > 0);
-	arrayOfArrays2 = arrayOfArrays2.filter(array => array.length > 0);
+	return results;
+}
 
-	return [arrayOfArrays1, arrayOfArrays2];
+function createAndConfigureTabs(browser)
+{
+	return Promise.all([...Array(GENERAL_CONFIG.numberOfTabsUsed).keys()].map(() => browser.newPage()));
+}
+
+function timeConversion(ms)
+{
+	let seconds = (ms / 1000).toFixed(1);
+	let minutes = (ms / (1000 * 60)).toFixed(1);
+	let hours = (ms / (1000 * 60 * 60)).toFixed(1);
+	let days = (ms / (1000 * 60 * 60 * 24)).toFixed(1);
+
+	if (seconds < 60) {
+		return seconds + " Sec";
+	} else if (minutes < 60) {
+		return minutes + " Min";
+	} else if (hours < 24) {
+		return hours + " Hrs";
+	} else {
+		return days + " Days"
+	}
+}
+
+function showProgress(currentNumberOfActivitiesCrawled, totalNumberOfActivities, beginTime)
+{
+	const timeElapsed = timeConversion(new Date() - beginTime);
+	console.log(`Progress ${currentNumberOfActivitiesCrawled}/${totalNumberOfActivities} (${100.0 * currentNumberOfActivitiesCrawled/totalNumberOfActivities} %) (${timeElapsed} elapsed)`);
 }
 
 //Execute the main process
-(async () => {
-	//Reading and parse the file containing activity string
-	let data = await fs.readFile("./activitiesString.json");
-	let activitiesStringTab = JSON.parse(data.toString());
+(async () =>
+{
+	//Create browser and tabs
+	const browser = await puppeteer.launch({headless: GENERAL_CONFIG.headlessMode});
 
+	const tabs = await createAndConfigureTabs(browser);
 
-	//options: { wantedNumberResults: 750, activitiesPerSecond: 2, web: true}
-	//options: { wantedNumberResults: 750, activitiesPerSecond: 2, image: true}
-	await getResultsFromActivitiesString(activitiesStringTab, { wantedNumberResults: 10, activitiesPerSecond: 1, image: true } );
+	//Request words
+	let requestWords = GENERAL_CONFIG.requestWords;
+
+	//Init Progress variables
+	let totalNumberOfActivities = activitiesString.length;
+	let currentNumberOfActivitiesCrawled = 0;
+	let beginTime = new Date();
+	showProgress(currentNumberOfActivitiesCrawled, totalNumberOfActivities, beginTime);
+
+	from(activitiesString)
+	.pipe(map(activityString => addUrl(activityString, requestWords)))
+	.pipe(bufferCount(GENERAL_CONFIG.numberOfTabsUsed))
+	.pipe(concatMap( someActivityObjects =>
+		{
+			let tabNumber = -1;
+			return from(someActivityObjects)
+			.pipe(mergeMap(oneActivityObj =>
+			{
+				tabNumber++;
+				return getResultsFromActivityObj(oneActivityObj, tabs[tabNumber])
+			}))
+				.pipe(tap(oneActivityObj =>
+				{
+					currentNumberOfActivitiesCrawled++;
+					showProgress(currentNumberOfActivitiesCrawled, totalNumberOfActivities, beginTime);
+				}));
+		}
+	))
+	//.pipe(mergeAll())
+	.pipe(toArray())
+	.subscribe(async activityObjTab =>
+	{
+		await createFileOfResults(activityObjTab);
+		await browser.close();
+	});
 })();

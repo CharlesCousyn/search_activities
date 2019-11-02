@@ -1,0 +1,9 @@
+{
+  "numberOfTabsUsed": 1,
+  "baseUrl" : "https://duckduckgo.com/?q=",
+  "endUrlImage" : "&iar=images&ia=images&iax=images",
+  "wantedNumberResults": 2,
+  "crawlMode": "image",
+  "requestWords" : "how to ",
+  "headlessMode": true
+}
