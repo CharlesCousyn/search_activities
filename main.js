@@ -3,10 +3,40 @@ import GENERAL_CONFIG from "./generalConfig"
 
 const filesystem = require('fs').promises;
 import { from} from 'rxjs'
-import { map, concatMap, mergeMap, toArray, bufferCount, tap } from 'rxjs/operators'
+import { map, concatMap, mergeMap, toArray, bufferCount, tap} from 'rxjs/operators'
 import puppeteer from "puppeteer"
 import searchResultWeb from "./entities/searchResultWeb";
 import searchResultImage from "./entities/searchResultImage";
+
+async function chooseContentFiltering(tab, contentFiltering)
+{
+	await tab.waitForSelector(".js-search-filters.search-filters>*:nth-child(2)");
+	await tab.click(".js-search-filters.search-filters>*:nth-child(2)");
+	await waitForProm(tab, 250);
+
+	let filterSelector = "";
+	switch(contentFiltering)
+	{
+		case "noFilter":
+			filterSelector = "[data-value=\"-2\"].modal__list__link.has-description.js-dropdown-items";
+			break;
+		case "moderate":
+			filterSelector = "[data-value=\"-1\"].modal__list__link.has-description.js-dropdown-items";
+			break;
+		case "strict":
+			filterSelector = "[data-value=\"1\"].modal__list__link.has-description.js-dropdown-items";
+			break;
+		default:
+			console.error("Bad contentFiltering")
+	}
+
+	//console.log("I'm going to click");
+	await tab.waitForSelector(filterSelector);
+	await Promise.all([
+		tab.waitForNavigation( {waitUntil: "load", timeout: 3000000}),
+		tab.click(filterSelector)
+	]);
+}
 
 function addUrl(activityString, requestWords)
 {
@@ -89,14 +119,14 @@ function activityString2Url(activityString, baseUrl, endUrl, requestWords)
 
 }
 
-async function crawl(tab)
+async function crawl(oneActivityObj, tab)
 {
 	switch(GENERAL_CONFIG.crawlMode)
 	{
 		case "web":
-			return crawlWeb(tab);
+			return crawlWeb(oneActivityObj, tab);
 		case "image":
-			return crawlImages(tab);
+			return crawlImages(oneActivityObj, tab);
 	}
 }
 
@@ -104,9 +134,10 @@ async function getResultsFromActivityObj(oneActivityObj, tab)
 {
 	//console.log(oneActivityObj);
 	await tab.goto(oneActivityObj.url, {waitUntil: "load", timeout: 3000000});
+	await chooseContentFiltering(tab, GENERAL_CONFIG.contentFiltering);
 
 	//Get results promise of results
-	const results = await crawl(tab);
+	const results = await crawl(oneActivityObj, tab);
 
 	oneActivityObj.realNumberResults = results.length;
 	oneActivityObj.results = results;
@@ -124,7 +155,7 @@ function getPropertyFromElement(tab, element, propertyName)
 	return tab.evaluate((element, propertyName) => element[propertyName], element, propertyName);
 }
 
-async function crawlImages(tab)
+async function crawlImages(oneActivityObj, tab)
 {
 	//ARTIFICIAL FIX
 	const maxNumberResults = GENERAL_CONFIG.wantedNumberResults + 1;
@@ -138,7 +169,7 @@ async function crawlImages(tab)
 
 		//Find the first image and click on it
 		await tab.waitForSelector(".tile.tile--img.has-detail");
-		await tab.click(".tile.tile--img.has-detail");
+		await tab.evaluate(() => document.querySelector(".tile.tile--img.has-detail").click());
 		//console.log("Click first image");
 
 
@@ -196,6 +227,8 @@ async function crawlImages(tab)
 	catch (e)
 	{
 		console.error(e);
+		console.error("Taking a screenshot...");
+		await tab.screenshot({path:`./errorDir/${oneActivityObj.name}.png`});
 	}
 
 	//ARTIFICIAL FIX
@@ -203,10 +236,11 @@ async function crawlImages(tab)
 	//return results;
 }
 
-async function crawlWeb(tab)
+async function crawlWeb(oneActivityObj, tab)
 {
 	const maxNumberResults = GENERAL_CONFIG.wantedNumberResults;
 	let results = [];
+	let resultsSelector = GENERAL_CONFIG.advertisementAllowed ? ".result__body" : "#links .result__body";
 
 	try
 	{
@@ -219,8 +253,8 @@ async function crawlWeb(tab)
 			results = [];
 
 			//Get current HTML results
-			await tab.waitForSelector(".result__body");
-			const elems = await tab.$$(".result__body");
+			await tab.waitForSelector(resultsSelector);
+			const elems = await tab.$$(resultsSelector);
 
 			//extract info to create searchResults
 			for(let elem of elems)
@@ -409,6 +443,7 @@ function showProgress(currentNumberOfActivitiesCrawled, totalNumberOfActivities,
 	))
 	//.pipe(mergeAll())
 	.pipe(toArray())
+	.pipe(map(arr => arr.sort((a,b) => (a.name > b.name) ? 1 : ((b.name > a.name) ? -1 : 0))))
 	.subscribe(async activityObjTab =>
 	{
 		await createFileOfResults(activityObjTab);
