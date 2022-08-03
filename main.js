@@ -1,3 +1,4 @@
+//import activitiesString from "./activitiesStringOld"
 import activitiesString from "./activitiesString"
 import GENERAL_CONFIG from "./generalConfig"
 
@@ -11,6 +12,7 @@ import searchResultImage from "./entities/searchResultImage";
 async function chooseContentFiltering(tab, contentFiltering)
 {
 	await tab.waitForSelector(".js-search-filters.search-filters>*:nth-child(2)");
+	//await tab.evaluate(filterSelector => document.querySelector(filterSelector).click(), ".js-search-filters.search-filters>*:nth-child(2)");
 	await tab.click(".js-search-filters.search-filters>*:nth-child(2)");
 	await waitForProm(tab, 250);
 
@@ -33,12 +35,13 @@ async function chooseContentFiltering(tab, contentFiltering)
 	//console.log("I'm going to click");
 	await tab.waitForSelector(filterSelector);
 	await Promise.all([
-		tab.waitForNavigation( {waitUntil: "load", timeout: 3000000}),
-		tab.click(filterSelector)
+		tab.waitForNavigation( {waitUntil: "load", timeout: 30000}),
+		tab.evaluate(filterSelector => document.querySelector(filterSelector).click(), filterSelector)
 	]);
 }
 
-function addUrl(activityString, requestWords)
+
+function addUrlAndFolderName(activityString, requestWords)
 {
 	//Static variables
 	let baseUrl = GENERAL_CONFIG.baseUrl;
@@ -47,6 +50,7 @@ function addUrl(activityString, requestWords)
 	//Construct url from activities string
 	return{
 		name: activityString,
+		folderName: activityString.replace(" ", "_"),
 		url: activityString2Url(activityString, baseUrl, endUrlImage, requestWords),
 		wantedNumberResults: GENERAL_CONFIG.wantedNumberResults
 	};
@@ -134,7 +138,7 @@ async function getResultsFromActivityObj(oneActivityObj, tab)
 {
 	//console.log(oneActivityObj);
 	await tab.goto(oneActivityObj.url, {waitUntil: "load", timeout: 3000000});
-	await chooseContentFiltering(tab, GENERAL_CONFIG.contentFiltering);
+	//await chooseContentFiltering(tab, GENERAL_CONFIG.contentFiltering);
 
 	//Get results promise of results
 	const results = await crawl(oneActivityObj, tab);
@@ -423,7 +427,7 @@ function showProgress(currentNumberOfActivitiesCrawled, totalNumberOfActivities,
 	showProgress(currentNumberOfActivitiesCrawled, totalNumberOfActivities, beginTime);
 
 	from(activitiesString)
-	.pipe(map(activityString => addUrl(activityString, requestWords)))
+	.pipe(map(activityString => addUrlAndFolderName(activityString, requestWords)))
 	.pipe(bufferCount(GENERAL_CONFIG.numberOfTabsUsed))
 	.pipe(concatMap( someActivityObjects =>
 		{

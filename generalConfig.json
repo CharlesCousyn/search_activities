@@ -1,11 +1,11 @@
 {
-  "numberOfTabsUsed": 5,
+  "numberOfTabsUsed": 1,
   "baseUrl" : "https://duckduckgo.com/?q=",
   "endUrlImage" : "&iar=images&ia=images&iax=images",
-  "wantedNumberResults": 10,
-  "crawlMode": "image",
+  "wantedNumberResults": 2500,
+  "crawlMode": "web",
   "requestWords" : "how to ",
-  "headlessMode": true,
+  "headlessMode": false,
   "contentFiltering": "moderate",
   "advertisementAllowed": false
 }
